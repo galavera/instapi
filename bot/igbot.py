@@ -93,36 +93,24 @@ class InstagramBot:
 
     def reels_to_instagram(self, reel_path, post_data_path, thumbnail_path,
                            hashtags=".", call_to_action=".", user_mention: bool = True):
-        data_paths = post_data_path  # .txt files
-        video_paths = reel_path  # tiktok video files
+        data_paths = post_data_path
+        video_paths = reel_path
         my_hashtags = hashtags
         my_call_to_action = call_to_action
 
         while video_paths:
+            # loop for videos in the directory
             print(f"Remaining files: {len(video_paths)}")
             filepath = video_paths.pop(0)
             datapath = data_paths.pop(0)
             caption, mention = read_caption_mention(datapath)
-            # temporary caption fix
-            character = "#"
-
-            first_index = caption.find(character)
-
-            if first_index != -1:
-                second_index = caption.find(character, first_index + 1)
-                if second_index != -1:
-                    cut_caption = caption[:second_index]
-                else:
-                    cut_caption = caption[first_index:]
-            else:
-                cut_caption = caption
             # for user_mention bool
             if user_mention:
                 mention = f"@ {mention}"
             else:
                 mention = ""
-            reel_caption = f"{cut_caption}\n\n{my_call_to_action}\n\n{my_hashtags}\n\n{mention}"
-            print(f"Processing file: {filepath}, Caption: {cut_caption}, Mention: {mention}")
+            reel_caption = f"{caption}\n\n{my_call_to_action}\n\n{my_hashtags}\n\n{mention}"
+            print(f"Processing file: {filepath}, Caption: {caption}, Mention: {mention}")
 
             filepath = Path(filepath)
             datapath = Path(datapath)

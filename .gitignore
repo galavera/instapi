@@ -1,0 +1,12 @@
+venv
+.idea
+tiktok
+bot/ig_settings.json
+log.log
+bot/download.log
+test.py
+
+
+
+
+

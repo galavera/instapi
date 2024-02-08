@@ -38,6 +38,7 @@ class InstagramBot:
             self.client.dump_settings(path)
             return
         else:
+            print("Session data found")
             pass
         session = self.client.load_settings(path)
         login_via_session = False
@@ -83,13 +84,13 @@ class InstagramBot:
 
     @staticmethod
     def first_login():
-        folder = os.getcwd()
-        files = os.listdir(folder)
-        for file in files:
-            if file == "ig_settings.json":
-                return False
-            else:
-                return True
+        folder = os.path.dirname(os.path.abspath(__file__))
+        file = glob.glob(folder + "/*.json")
+        print(file)
+        if file:
+            return False
+        else:
+            return True
 
     def reels_to_instagram(self, reel_path, post_data_path, thumbnail_path,
                            hashtags=".", call_to_action=".", user_mention: bool = True):

@@ -25,7 +25,7 @@ class InstagramBot:
 
     def login_user(self):
         logger = self.get_logger()
-        str_path = "ig_settings.json"
+        str_path = "../ig_settings.json"
         path = Path(str_path)
         if self.proxy is None:
             pass

@@ -1,11 +1,16 @@
 venv
 .idea
-tiktok
+themes
+downloads
 ig_settings.json
 log.log
-bot/download.log
+download.log
 test.py
 url_list.txt
+theme
+azure.tcl
+pyinstaller tkinter fix.txt
+examples
 
 
 

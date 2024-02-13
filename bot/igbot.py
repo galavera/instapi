@@ -14,27 +14,25 @@ from lib.yt_dl_app import (read_caption_mention,
 
 class InstagramBot:
 
-    def __init__(self, username, password, proxy: str = None,
-                 delay_range: list = (5, 10)):
-        self.filepath = None
-        self.username = username
-        self.password = password
-        self.proxy = proxy
+    def __init__(self, delay_range: list = (5, 10)):
         self.delay_range = delay_range
         self.client = Client()
 
-    def login_user(self):
+    def login_user(self, username, password, proxy=None):
         logger = self.get_logger()
-        str_path = "./ig_settings.json"
+        self.client.username = username
+        self.client.password = password
+        self.client.proxy = proxy
+        str_path = "ig_settings.json"
         path = Path(str_path)
-        if self.proxy is None:
+        if self.client.proxy is None:
             pass
         else:
-            self.client.set_proxy(self.proxy)
+            self.client.set_proxy(proxy)
 
         if self.first_login():
             print("Logging in for the first time\n Creating session data")
-            self.client.login(self.username, self.password)
+            self.client.login(username, password)
             self.client.dump_settings(path)
             return
         else:
@@ -46,7 +44,7 @@ class InstagramBot:
         if session:
             try:
                 self.client.set_settings(session)
-                self.client.login(self.username, self.password)
+                self.client.login(username, password)
 
                 # check if session is valid
                 try:
@@ -61,7 +59,7 @@ class InstagramBot:
                     self.client.set_settings({})
                     self.client.set_uuids(old_session["uuids"])
 
-                    self.client.login(self.username, self.password)
+                    self.client.login(username, password)
                     self.client.dump_settings(path)
                 login_via_session = True
                 print("Logged in via session information")
@@ -72,8 +70,8 @@ class InstagramBot:
         if not login_via_session:
             try:
                 print('test')
-                logger.info("Attempting to login via username and password. username: %s" % self.username)
-                self.client.login(self.username, self.password)
+                logger.info("Attempting to login via username and password. username: %s" % username)
+                self.client.login(username, password)
                 self.client.dump_settings(path)
                 if self.client.get_timeline_feed():
                     login_via_pw = True
@@ -85,7 +83,7 @@ class InstagramBot:
     @staticmethod
     def first_login():
         folder = os.path.dirname(os.path.abspath(__file__))
-        file = glob.glob(folder + "/*.json")
+        file = glob.glob(folder + r"\ig_settings.json")
         print(file)
         if file:
             return False

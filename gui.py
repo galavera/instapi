@@ -1,6 +1,5 @@
 import tkinter as tk
 from bot.igbot import InstagramBot
-# Explicit imports to satisfy Flake8
 from tkinter import (Canvas, Entry, Text, Button,
                      PhotoImage, filedialog, messagebox,
                      Menubutton, Menu)
@@ -56,8 +55,8 @@ def click_login():
         proxy = proxy_entry.get()
         if not username or not password:
             window.after(0, lambda:
-            messagebox.showwarning
-            ("Login Failed", "Username or password cannot be empty.")
+                         messagebox.showwarning
+                         ("Login Failed", "Username or password cannot be empty.")
                          )
             successful_login = False
         else:
@@ -67,8 +66,8 @@ def click_login():
                 successful_login = True
             except Exception as e:
                 window.after(0, lambda e=e:
-                messagebox.showerror
-                ("Login Failed", f"An error occurred during login: {e}")
+                             messagebox.showerror
+                             ("Login Failed", f"An error occurred during login: {e}")
                              )
                 successful_login = False
             window.after(0, lambda: successful_login)
@@ -82,13 +81,12 @@ def click_login():
 
 
 def click_start():
+    """
+    starts the post scheduling feature of the bot
+    """
     window.after(0, lambda: start_button.config(state='disabled'))
 
     def start_thread():
-        """
-        starts the post scheduling feature of the bot
-        :return:
-        """
         directory = directory_entry.get()
         directory = os.path.normpath(directory)
         sleep_time = int(sleep_entry.get())
@@ -119,10 +117,8 @@ def click_start():
     threading.Thread(target=start_thread, daemon=True).start()
 
 
-def stop_bot():
-    logger.info("Stopping the bot...")
-    window.after(0, lambda: print("Stopping the bot...please wait."))
-    cl.interruptible_sleep.stop_event.is_set()
+def stop_button_click():
+    window.after(0, lambda: cl.stop_bot())
     window.after(0, lambda: start_button.config(state='normal'))
 
 
@@ -309,7 +305,7 @@ def limit_hashtags(event):
     # Check hashtags and if the last character is space to allow for deletion of tags
     if len(hashtags + hashtags2) >= 29 and event.char == '#':
         window.after(0, lambda: messagebox.showinfo
-        ("Instagram", "You have reached the maximum number of hashtags.\n"
+                     ("Instagram", "You have reached the maximum number of hashtags.\n"
                       "Instagram only allows 30 hashtags.")
                      )
         return 'break'  # Prevent insertion of more hashtags
@@ -680,7 +676,7 @@ stop_button = Button(
     image=button_image_11,
     borderwidth=0,
     highlightthickness=0,
-    command=lambda: stop_bot(),
+    command=lambda: stop_button_click(),
     relief="flat",
     activebackground="#2D2C2C"
 )
@@ -1102,9 +1098,12 @@ image_12 = canvas.create_image(
     image=image_image_12
 )
 
-"""# tabConbtrol.add(tab1, text=str(instabot))
+""" # test
+tabConbtrol.add(tab1, text=str(instabot))
 tabConbtrol.pack(expand=1)
-ttk.Label(tab1, text="HI").grid(column=0, row=0, padx=30, pady=30)"""
+ttk.Label(tab1, text="HI").grid(column=0, row=0, padx=30, pady=30)
+"""
+
 # tracks the hide password button's state
 is_password_icon_toggled = False
 

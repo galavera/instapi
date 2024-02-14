@@ -140,9 +140,14 @@ class InstagramBot:
         while (time.time() - start_time) < sleep_duration:
             if stop_event.is_set():
                 # Stop event is set, break the sleep
-                print("Instabot has been stopped.")
+                print("Instabot has been defeated in battle.")
                 break
             time.sleep(min(check_interval, sleep_duration - (time.time() - start_time)))
+
+    @staticmethod
+    def stop_bot():
+        print("Stopping the bot...please wait.")
+        stop_event.set()
 
     @staticmethod
     def countdown_sleep(duration, interval=60 * 10):

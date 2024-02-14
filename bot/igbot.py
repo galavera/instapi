@@ -7,7 +7,6 @@ from instagrapi.exceptions import LoginRequired
 from pathlib import Path
 from datetime import datetime, timedelta
 
-
 # THIS IS THE BACKEND CODE THAT RUNS MAIN.PY
 # CHANGING ANYTHING IN THIS FILE COULD BREAK THE MAIN FUNCTIONS!
 
@@ -112,10 +111,9 @@ class InstagramBot:
             future_time = datetime.now() + timedelta(seconds=sleep_duration)
             formatted_time = future_time.strftime("%I:%M %p").lstrip("0").replace("AM", "am").replace("PM", "pm")
             print(f"Starting the sleep timer.\n"
-                  f"I will update the time remaining every 10 minutes.\n"
                   f"Next post will be uploaded after the sleep timer ends\n(approx:{formatted_time})\n"
                   f"You can minimize the app and I'll continue working.\n")
-            self.countdown_sleep(sleep_duration)
+            self.interruptible_sleep(sleep_duration, 30)
             print("Sleep timer completed. Ready to upload the next post!")
 
     def handle_relogin_and_upload(self, reel_path, reel_caption, post_data_path):
@@ -129,6 +127,18 @@ class InstagramBot:
         for thumbnail_path in Path(thumbnail_dir).glob('*.jpg'):
             os.remove(thumbnail_path)
         print("Finished cleaning up thumbnails.")
+
+    @staticmethod
+    def interruptible_sleep(sleep_duration, check_interval):
+        from threading import Event
+        stop_event = Event()
+        stop_event.clear()
+        start_time = time.time()
+        while (time.time() - start_time) < sleep_duration:
+            if stop_event.is_set():
+                # Stop event is set, break the sleep
+                break
+            time.sleep(min(check_interval, sleep_duration - (time.time() - start_time)))
 
     @staticmethod
     def countdown_sleep(duration, interval=60 * 10):

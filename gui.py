@@ -24,7 +24,6 @@ SCRIPT_DIR = Path(__file__).resolve().parent
 ASSETS_PATH = SCRIPT_DIR / "build" / "assets"
 
 info_label = None
-stop_event = threading.Event()
 
 
 class StdoutRedirector(object):
@@ -57,8 +56,8 @@ def click_login():
         proxy = proxy_entry.get()
         if not username or not password:
             window.after(0, lambda:
-                         messagebox.showwarning
-                         ("Login Failed", "Username or password cannot be empty.")
+            messagebox.showwarning
+            ("Login Failed", "Username or password cannot be empty.")
                          )
             successful_login = False
         else:
@@ -69,8 +68,8 @@ def click_login():
                 successful_login = True
             except Exception as e:
                 window.after(0, lambda e=e:
-                             messagebox.showerror
-                             ("Login Failed", f"An error occurred during login: {e}")
+                messagebox.showerror
+                ("Login Failed", f"An error occurred during login: {e}")
                              )
                 successful_login = False
             window.after(0, lambda: successful_login)
@@ -84,44 +83,49 @@ def click_login():
 
 
 def click_start():
+    window.after(0, lambda: start_button.config(state='disabled'))
+
     def start_thread():
         """
         starts the post scheduling feature of the bot
         :return:
         """
-        stop_event.clear()
-        directory = directory_entry.get()
+        directory = window.after(0, lambda: directory_entry.get())
         directory = os.path.normpath(directory)
+        sleep_time = window.after(0, lambda: int(sleep_entry.get()))
         mention = False
-        while not stop_event.is_set():
-            if not directory:
-                window.after(0, lambda: messagebox.showwarning
-                             ("Error", "Directory cannot be empty.")
-                             )
-                return
-            elif directory:
-                try:
-                    mp4_files, txt_files = setup_folders(directory)
-                    if not mp4_files or not txt_files:
-                        window.after(0, lambda: messagebox.showinfo
-                                     ("Error", "No mp4 or text files found in the directory.")
-                                     )
-                    hashtags = hashtags_entry.get("1.0", "end-1c")
-                    call_to_action = calltoaction_entry.get("1.0", "end-1c")
-                    window.after(0, lambda: print("Starting the bot"))
-                    cl.reels_to_instagram(mp4_files, txt_files, directory, hashtags, call_to_action, mention)
-                except Exception as e:
+        if not directory:
+            window.after(0, lambda: messagebox.showwarning
+                         ("Error", "Directory cannot be empty.")
+                         )
+            return
+        elif directory:
+            try:
+                mp4_files, txt_files = setup_folders(directory)
+                if not mp4_files or not txt_files:
+                    window.after(0, lambda: messagebox.showinfo
+                                 ("Error", "No mp4 or text files found in the directory.")
+                                 )
+                hashtags = window.after(0, lambda: hashtags_entry.get("1.0", "end-1c"))
+                call_to_action = window.after(0, lambda: calltoaction_entry.get("1.0", "end-1c"))
+                window.after(0, lambda: print("Starting the bot"))
+                cl.reels_to_instagram(mp4_files, txt_files, directory,
+                                      hashtags, call_to_action, mention, sleep_time)
+            except Exception as e:
 
-                    window.after(0, lambda e=e: messagebox.showerror("Error", f"An error occurred: {e}"))
-            else:
-                window.after(0, lambda: messagebox.showwarning("Error", "You need to login first."))
-        print("Bot stopped.")
+                window.after(0, lambda e=e: messagebox.showerror("Error", f"An error occurred: {e}"))
+        else:
+            window.after(0, lambda: messagebox.showwarning("Error", "You need to login first."))
+
     threading.Thread(target=start_thread, daemon=True).start()
 
 
 def stop_bot():
-    stop_event.set()
-    window.after(0, lambda: print("Stopping the bot..."))
+    logger.info("Stopping the bot...")
+    window.after(0, lambda: print("Stopping the bot...please wait."))
+    stop_event = threading.Event()
+    stop_event.is_set()
+    window.after(0, lambda: start_button.config(state='normal'))
 
 
 def open_folder():
@@ -136,9 +140,6 @@ def open_folder():
 
 
 def save_default_config():
-    # messagebox.showinfo("Exiting", "Saving current configuration...")
-    exit_message = Message(text="Saving current configuration...")
-    Message.place(exit_message, x=300, y=300)
     config_file = "autosave.json"
     config_data = {
         'username': username_entry.get(),
@@ -171,34 +172,68 @@ def save_config():
     return print("Configuration saved.")
 
 
-def load_default_config():
-    def load_thread():
-        config_file = "autosave.json"
-        try:
-            with open(config_file, 'r') as file:
-                config_data = json.load(file)
-                username_entry.delete(0, tk.END)
-                username_entry.insert(0, config_data.get('username', ''))
-                password_entry.delete(0, tk.END)
-                password_entry.insert(0, config_data.get('password', ''))
-                directory_entry.config(state='normal')
-                directory_entry.delete(0, tk.END)
-                directory_entry.insert(0, config_data.get('folder_path', ''))
-                directory_entry.xview_moveto(1)
-                directory_entry.config(state='disabled')
-                hashtags_entry.delete("1.0", tk.END)
-                hashtags_entry.insert("1.0", config_data.get('hashtags', ''))
-                calltoaction_entry.delete("1.0", tk.END)
-                calltoaction_entry.insert("1.0", config_data.get('call_to_action', ''))
-                proxy_entry.delete(0, tk.END)
-                proxy_entry.insert(0, config_data.get('proxy', ''))
-                sleep_entry.configure(state='normal')
-                sleep_entry.delete(0, tk.END)
-                sleep_entry.insert(0, config_data.get('sleep', ''))
-                sleep_entry.configure(state='disabled')
-        except FileNotFoundError:
-            pass
-    threading.Thread(target=load_thread).start()
+def execute_config_steps():
+    # Load data from the config file
+    def load_config_data():
+        with open('autosave.json') as file:
+            return json.load(file)
+
+    # Update username entry
+    def update_username_entry():
+        config_data = load_config_data()
+        username_entry.delete(0, tk.END)
+        username_entry.insert(0, config_data.get('username', ''))
+
+    # Update password entry
+    def update_password_entry():
+        config_data = load_config_data()
+        password_entry.delete(0, tk.END)
+        password_entry.insert(0, config_data.get('password', ''))
+
+    # Update directory entry
+    def update_directory_entry():
+        config_data = load_config_data()
+        directory_entry.config(state='normal')
+        directory_entry.delete(0, tk.END)
+        directory_entry.insert(0, config_data.get('folder_path', ''))
+        directory_entry.xview_moveto(1)
+        directory_entry.config(state='disabled')
+
+    # Update hashtags entry
+    def update_hashtags_entry():
+        config_data = load_config_data()
+        hashtags_entry.delete("1.0", tk.END)
+        hashtags_entry.insert("1.0", config_data.get('hashtags', ''))
+
+    # Update call to action entry
+    def update_calltoaction_entry():
+        config_data = load_config_data()
+        calltoaction_entry.delete("1.0", tk.END)
+        calltoaction_entry.insert("1.0", config_data.get('call_to_action', ''))
+
+    # Update proxy entry
+    def update_proxy_entry():
+        config_data = load_config_data()
+        proxy_entry.delete(0, tk.END)
+        proxy_entry.insert(0, config_data.get('proxy', ''))
+
+    # Update sleep entry
+    def update_sleep_entry():
+        config_data = load_config_data()
+        sleep_entry.configure(state='normal')
+        sleep_entry.delete(0, tk.END)
+        sleep_entry.insert(0, config_data.get('sleep', ''))
+        sleep_entry.configure(state='disabled')
+
+    # Execute each function sequentially
+    window.after(0, lambda: load_config_data())
+    window.after(0, lambda: update_username_entry())
+    window.after(0, lambda: update_password_entry())
+    window.after(0, lambda: update_directory_entry())
+    window.after(0, lambda: update_hashtags_entry())
+    window.after(0, lambda: update_calltoaction_entry())
+    window.after(0, lambda: update_proxy_entry())
+    window.after(0, lambda: update_sleep_entry())
 
 
 def load_config():
@@ -276,7 +311,7 @@ def limit_hashtags(event):
     # Check hashtags and if the last character is space to allow for deletion of tags
     if len(hashtags + hashtags2) >= 29 and event.char == '#':
         window.after(0, lambda: messagebox.showinfo
-                     ("Instagram", "You have reached the maximum number of hashtags.\n"
+        ("Instagram", "You have reached the maximum number of hashtags.\n"
                       "Instagram only allows 30 hashtags.")
                      )
         return 'break'  # Prevent insertion of more hashtags
@@ -301,10 +336,16 @@ def hide_info(event):
         info_label = None
 
 
+def on_close():
+    save_default_config()
+    window.destroy()
+
+
 window = tk.Tk()
+window.withdraw()
 window.title("instabot")
 # window.overrideredirect(True)
-window.iconphoto(False, PhotoImage(file=relative_to_assets("instapi_2.png")))
+# window.iconphoto(False, PhotoImage(file=relative_to_assets("instapi_2.png")))
 
 """tabConbtrol = ttk.Notebook(window)
 tab1 = ttk.Frame(tabConbtrol)"""
@@ -1065,17 +1106,46 @@ image_12 = canvas.create_image(
 """# tabConbtrol.add(tab1, text=str(instabot))
 tabConbtrol.pack(expand=1)
 ttk.Label(tab1, text="HI").grid(column=0, row=0, padx=30, pady=30)"""
+# tracks the hide password button's state
+is_password_icon_toggled = False
+
+# Create a top-level window for the splash screen
+splash_screen = tk.Toplevel()
+splash_screen.title("Splash Screen")
+
+# Load the image
+splash_image = tk.PhotoImage(file=relative_to_assets("splash_screen.png"))
+splash_label = tk.Label(splash_screen, image=splash_image)
+splash_label.place(relx=0.5, rely=0.5, anchor='center')
+
+# Remove window decorations
+splash_screen.overrideredirect(True)
+
+# Center the splash screen window on the screen
+window_width, window_height = splash_image.width(), splash_image.height()
+screen_width = splash_screen.winfo_screenwidth()
+screen_height = splash_screen.winfo_screenheight()
+x_coordinate = (screen_width - window_width) // 2
+y_coordinate = (screen_height - window_height) // 2
+splash_screen.geometry(f"{window_width}x{window_height}+{x_coordinate}+{y_coordinate}")
+
 # CLI redirect to app console
 sys.stdout = StdoutRedirector(console)
 
 # Load the configuration on startup
-window.after(100, load_default_config)  # Delay call to give time for window update
+window.after(100, execute_config_steps())  # Delay call to give time for window update
 
-# tracks the hide password button's state
-is_password_icon_toggled = False
+
+def close_splash_and_show_main():
+    splash_screen.destroy()
+    window.deiconify()  # Show the main window
+
+
+# Destroy the splash screen after 3000 milliseconds
+splash_screen.after(3000, close_splash_and_show_main)
 
 # Save configuration upon exiting
-window.protocol("WM_DELETE_WINDOW", lambda: [save_default_config(), window.destroy()])
+window.wm_protocol("WM_DELETE_WINDOW", on_close)
 
 window.resizable(False, False)
 window.mainloop()

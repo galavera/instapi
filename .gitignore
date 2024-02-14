@@ -1,7 +1,5 @@
 venv
 .idea
-themes
-fitness
 lib
 examples
 ig_settings.json
@@ -9,7 +7,7 @@ log.log
 download.log
 test.py
 url_list.txt
-pyinstaller tkinter fix.txt
+
 
 
 

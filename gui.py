@@ -4,19 +4,27 @@ from bot.igbot import InstagramBot
 from tkinter import (Canvas, Entry, Text, Button,
                      PhotoImage, filedialog, messagebox,
                      Menubutton, Menu, Message)
-from tkinter.ttk import Notebook
-from lib.yt_dl_app import setup_folders
+# from tkinter.ttk import Notebook
 from pathlib import Path
 import json
 import sys
 import time
+import os
+import glob
 import threading
+import logging
+from functools import partial
+
+logging.basicConfig(filename='log.log', encoding='utf-8', level=logging.ERROR)
+logger = logging.getLogger('gui')
 
 cl = InstagramBot()
 
-OUTPUT_PATH = Path(__file__).parent
-ASSETS_PATH = OUTPUT_PATH / Path(
-    r"***REMOVED***\instapi\build\assets\frame0")
+SCRIPT_DIR = Path(__file__).resolve().parent
+ASSETS_PATH = SCRIPT_DIR / "build" / "assets"
+
+info_label = None
+stop_event = threading.Event()
 
 
 class StdoutRedirector(object):
@@ -42,47 +50,78 @@ def click_login():
     Log in to Instagram with the given username and password.
     :return: True if login was successful, False otherwise
     """
-    username = username_entry.get()
-    password = password_entry.get()
-    proxy = proxy_entry.get()
-    if not username or not password:
-        print("Username or password cannot be empty.")
-        return False
-    else:
-        cl.login_user(username, password, proxy)
-        print("Logged in")
-        return True
+
+    def login_thread():
+        username = username_entry.get()
+        password = password_entry.get()
+        proxy = proxy_entry.get()
+        if not username or not password:
+            window.after(0, lambda:
+                         messagebox.showwarning
+                         ("Login Failed", "Username or password cannot be empty.")
+                         )
+            successful_login = False
+        else:
+            try:
+                cl.login_user(username, password, proxy)
+                window.after(0, lambda: print("Logged in successfully...\n"
+                                              "You can now start the bot."))
+                successful_login = True
+            except Exception as e:
+                window.after(0, lambda e=e:
+                             messagebox.showerror
+                             ("Login Failed", f"An error occurred during login: {e}")
+                             )
+                successful_login = False
+            window.after(0, lambda: successful_login)
+        if successful_login:
+            window.after(0, lambda: start_button.config(state='normal'))
+        else:
+            pass
+
+    # Start the login process in a new thread
+    threading.Thread(target=login_thread, daemon=True).start()
 
 
 def click_start():
-    """
-    starts the post scheduling feature of the bot
-    :return:
-    """
-    hashtags = hashtags_entry.get("1.0", "end-1c")
-    call_to_action = calltoaction_entry.get("1.0", "end-1c")
-    directory = directory_entry.get()
-    directory = 'r' + directory
-    mention = False
-    if not click_login():
-        # Update console or show a message box
-        raise ValueError("Not logged in. Log-in and try again.")
-    else:
-        pass
-    if not directory:
-        print("Directory cannot be empty.")
-        return
-    else:
-        mp4_files, txt_files = setup_folders(directory)
-        if not mp4_files:
-            print("No mp4 files found in the directory.")
-            return
-        if not txt_files:
-            print("No text files found in the directory.")
-            return
-        print("Starting the bot")
-        cl.reels_to_instagram(mp4_files, txt_files, directory, hashtags, call_to_action, mention)
-    # Validate login
+    def start_thread():
+        """
+        starts the post scheduling feature of the bot
+        :return:
+        """
+        stop_event.clear()
+        directory = directory_entry.get()
+        directory = os.path.normpath(directory)
+        mention = False
+        while not stop_event.is_set():
+            if not directory:
+                window.after(0, lambda: messagebox.showwarning
+                             ("Error", "Directory cannot be empty.")
+                             )
+                return
+            elif directory:
+                try:
+                    mp4_files, txt_files = setup_folders(directory)
+                    if not mp4_files or not txt_files:
+                        window.after(0, lambda: messagebox.showinfo
+                                     ("Error", "No mp4 or text files found in the directory.")
+                                     )
+                    hashtags = hashtags_entry.get("1.0", "end-1c")
+                    call_to_action = calltoaction_entry.get("1.0", "end-1c")
+                    window.after(0, lambda: print("Starting the bot"))
+                    cl.reels_to_instagram(mp4_files, txt_files, directory, hashtags, call_to_action, mention)
+                except Exception as e:
+
+                    window.after(0, lambda e=e: messagebox.showerror("Error", f"An error occurred: {e}"))
+            else:
+                window.after(0, lambda: messagebox.showwarning("Error", "You need to login first."))
+        print("Bot stopped.")
+    threading.Thread(target=start_thread, daemon=True).start()
+
+
+def stop_bot():
+    stop_event.set()
+    window.after(0, lambda: print("Stopping the bot..."))
 
 
 def open_folder():
@@ -133,33 +172,33 @@ def save_config():
 
 
 def load_default_config():
-    config_file = "autosave.json"
-    try:
-        with open(config_file, 'r') as file:
-            config_data = json.load(file)
-            username_entry.delete(0, tk.END)
-            username_entry.insert(0, config_data.get('username', ''))
-            password_entry.delete(0, tk.END)
-            password_entry.insert(0, config_data.get('password', ''))
-            directory_entry.delete(0, tk.END)
-            directory_entry.insert(0, config_data.get('folder_path', ''))
-            hashtags_entry.delete("1.0", tk.END)
-            hashtags_entry.insert("1.0", config_data.get('hashtags', ''))
-            calltoaction_entry.delete("1.0", tk.END)
-            calltoaction_entry.insert("1.0", config_data.get('call_to_action', ''))
-            proxy_entry.delete(0, tk.END)
-            proxy_entry.insert(0, config_data.get('proxy', ''))
-            sleep_entry.delete(0, tk.END)
-            sleep_entry.insert(0, config_data.get('sleep', ''))
-    except FileNotFoundError:
-        pass
-
-
-"""def show_loading_screen():
-    global loading_label
-    loading_label = tk.Label(window, text="Loading previous config...", anchor='center')
-    loading_label.place(x=300, y=300)
-    window.after(100, lambda: load_default_config())  # Delay call to give time for window update"""
+    def load_thread():
+        config_file = "autosave.json"
+        try:
+            with open(config_file, 'r') as file:
+                config_data = json.load(file)
+                username_entry.delete(0, tk.END)
+                username_entry.insert(0, config_data.get('username', ''))
+                password_entry.delete(0, tk.END)
+                password_entry.insert(0, config_data.get('password', ''))
+                directory_entry.config(state='normal')
+                directory_entry.delete(0, tk.END)
+                directory_entry.insert(0, config_data.get('folder_path', ''))
+                directory_entry.xview_moveto(1)
+                directory_entry.config(state='disabled')
+                hashtags_entry.delete("1.0", tk.END)
+                hashtags_entry.insert("1.0", config_data.get('hashtags', ''))
+                calltoaction_entry.delete("1.0", tk.END)
+                calltoaction_entry.insert("1.0", config_data.get('call_to_action', ''))
+                proxy_entry.delete(0, tk.END)
+                proxy_entry.insert(0, config_data.get('proxy', ''))
+                sleep_entry.configure(state='normal')
+                sleep_entry.delete(0, tk.END)
+                sleep_entry.insert(0, config_data.get('sleep', ''))
+                sleep_entry.configure(state='disabled')
+        except FileNotFoundError:
+            pass
+    threading.Thread(target=load_thread).start()
 
 
 def load_config():
@@ -174,6 +213,7 @@ def load_config():
             password_entry.insert(0, config_data.get('password', ''))
             directory_entry.delete(0, tk.END)
             directory_entry.insert(0, config_data.get('folder_path', ''))
+            directory_entry.xview_moveto(1)
             hashtags_entry.delete("1.0", tk.END)
             hashtags_entry.insert("1.0", config_data.get('hashtags', ''))
             calltoaction_entry.delete("1.0", tk.END)
@@ -217,10 +257,55 @@ def countdown_sleep(duration, interval=5):
         remaining -= interval
 
 
+def setup_folders(folder):
+    if not os.path.exists(folder):
+        print("directory does not exist")
+        raise FileNotFoundError
+    else:
+        pass
+    mp4_files = glob.glob(folder + "/*.mp4")
+    txt_files = glob.glob(folder + "/*.txt")
+    return mp4_files, txt_files
+
+
+def limit_hashtags(event):
+    content = hashtags_entry.get("1.0", tk.END)
+    content2 = calltoaction_entry.get("1.0", tk.END)
+    hashtags = [tag for tag in content.split() if tag.startswith('#')]
+    hashtags2 = [tag for tag in content2.split() if tag.startswith('#')]
+    # Check hashtags and if the last character is space to allow for deletion of tags
+    if len(hashtags + hashtags2) >= 29 and event.char == '#':
+        window.after(0, lambda: messagebox.showinfo
+                     ("Instagram", "You have reached the maximum number of hashtags.\n"
+                      "Instagram only allows 30 hashtags.")
+                     )
+        return 'break'  # Prevent insertion of more hashtags
+
+
+def show_info(event, text, x, y):
+    global info_label
+    if info_label is not None:
+        info_label.destroy()
+    # Create the tooltip label and place it on the canvas near the button
+    info_label = tk.Label(window, text=text, font=("Inter SemiBold", 10),
+                          bg="grey", fg="white", relief="solid",
+                          borderwidth=1, padx=5, pady=5, justify="left")
+    info_label.place(x=x, y=y)
+
+
+def hide_info(event):
+    global info_label
+    # Destroy the label when the mouse leaves the button
+    if info_label is not None:
+        info_label.destroy()
+        info_label = None
+
+
 window = tk.Tk()
 window.title("instabot")
 # window.overrideredirect(True)
-window.iconphoto(False, PhotoImage(file=relative_to_assets(r"***REMOVED***instapi_2.png")))
+window.iconphoto(False, PhotoImage(file=relative_to_assets("instapi_2.png")))
+
 """tabConbtrol = ttk.Notebook(window)
 tab1 = ttk.Frame(tabConbtrol)"""
 
@@ -300,10 +385,11 @@ info_button_2 = Button(
     image=button_image_1,
     borderwidth=0,
     highlightthickness=0,
-    command=lambda: print("info_button_2 clicked: info for directory"),
+    command=lambda: print("Hover over the button to see info."),
     relief="flat",
     activebackground="#2D2C2C"
 )
+
 info_button_2.place(
     x=274.0,
     y=341.0,
@@ -311,13 +397,19 @@ info_button_2.place(
     height=20.0
 )
 
+info_button_2.bind("<Enter>", partial(show_info, text="Click the up-arrow button\n"
+                                                      "to choose the folder where\n"
+                                                      "the reels you wish to schedule\n"
+                                                      "are located.", x=300, y=340))
+info_button_2.bind("<Leave>", hide_info)
+
 button_image_2 = PhotoImage(
     file=relative_to_assets("button_2.png"))
 info_button_3 = Button(
     image=button_image_2,
     borderwidth=0,
     highlightthickness=0,
-    command=lambda: print("info_button_3 clicked: info for options"),
+    command=lambda: print("Hover over the button to see info."),
     relief="flat",
     activebackground="#2D2C2C"
 )
@@ -328,13 +420,20 @@ info_button_3.place(
     height=20.0
 )
 
+info_button_3.bind("<Enter>", partial(show_info, text="proxy:\n"
+                                                      "Enter your proxy if you have one.\n"
+                                                      "sleep:\n"
+                                                      "Enter the time in minutes to wait\n"
+                                                      "inbetween posts.", x=300, y=454))
+info_button_3.bind("<Leave>", hide_info)
+
 button_image_3 = PhotoImage(
     file=relative_to_assets("button_3.png"))
 info_button_5 = Button(
     image=button_image_3,
     borderwidth=0,
     highlightthickness=0,
-    command=lambda: print("info_button_5 clicked: info for hashatags"),
+    command=lambda: print("Hover over the button to see info."),
     relief="flat",
     activebackground="#2D2C2C"
 )
@@ -345,13 +444,21 @@ info_button_5.place(
     height=20.0
 )
 
+info_button_5.bind("<Enter>", partial(show_info, text="Enter your hashtags (optional)\n"
+                                                      "they will be placed at the end\n"
+                                                      "of each caption.\n\n"
+                                                      "note:\n"
+                                                      "Instagram allows a maximum of 30\n"
+                                                      "hashtags.", x=415, y=340))
+info_button_5.bind("<Leave>", hide_info)
+
 button_image_4 = PhotoImage(
     file=relative_to_assets("button_4.png"))
 info_button_1 = Button(
     image=button_image_4,
     borderwidth=0,
     highlightthickness=0,
-    command=lambda: print("info_button_1 clicked: info for login"),
+    command=lambda: print("Hover over the button to see info."),
     relief="flat",
     activebackground="#2D2C2C"
 )
@@ -362,13 +469,17 @@ info_button_1.place(
     height=20.0
 )
 
+info_button_1.bind("<Enter>", partial(show_info, text="Enter your Instagram\n"
+                                                      "login credentials.", x=300, y=120))
+info_button_1.bind("<Leave>", hide_info)
+
 button_image_5 = PhotoImage(
     file=relative_to_assets("button_5.png"))
 info_button_4 = Button(
     image=button_image_5,
     borderwidth=0,
     highlightthickness=0,
-    command=lambda: print("info_button_4 clicked: info for call-to-action"),
+    command=lambda: print("Hover over the button to see info."),
     relief="flat",
     activebackground="#2D2C2C"
 )
@@ -378,6 +489,12 @@ info_button_4.place(
     width=20.0,
     height=20.0
 )
+info_button_4.bind("<Enter>", partial(show_info, text="Call to action(optional):\n"
+                                                      "Enter the cta that will be\n"
+                                                      "included in each post, below\n"
+                                                      "the caption.\n"
+                                                      "Could also just leave blank", x=450, y=120))
+info_button_4.bind("<Leave>", hide_info)
 
 button_image_6 = PhotoImage(
     file=relative_to_assets("button_6.png"))
@@ -420,13 +537,31 @@ image_10 = canvas.create_image(
     image=image_image_10
 )
 
+
+def increment():
+    current_value = int(sleep_entry.get())
+    sleep_entry.configure(state='normal')
+    sleep_entry.delete(0, tk.END)
+    sleep_entry.insert(0, str(current_value + 1))
+    sleep_entry.configure(state='disabled')
+
+
+def decrement():
+    current_value = int(sleep_entry.get())
+    if current_value > 60:
+        sleep_entry.configure(state='normal')
+        sleep_entry.delete(0, tk.END)
+        sleep_entry.insert(0, str(current_value - 1))
+        sleep_entry.configure(state='disabled')
+
+
 button_image_7 = PhotoImage(
     file=relative_to_assets("button_7.png"))
 sleep_minus_button = Button(
     image=button_image_7,
     borderwidth=0,
     highlightthickness=0,
-    command=lambda: print("sleep_minus_button clicked"),
+    command=decrement,
     relief="flat",
     activebackground="#2D2C2C"
 )
@@ -443,7 +578,7 @@ sleep_plus_button = Button(
     image=button_image_8,
     borderwidth=0,
     highlightthickness=0,
-    command=lambda: print("sleep_plus_button clicked"),
+    command=increment,
     relief="flat",
     activebackground="#2D2C2C"
 )
@@ -497,13 +632,15 @@ start_button.place(
     height=36.0
 )
 
+start_button.config(state='disabled')
+
 button_image_11 = PhotoImage(
     file=relative_to_assets("stop.png"))
 stop_button = Button(
     image=button_image_11,
     borderwidth=0,
     highlightthickness=0,
-    command=lambda: print(directory_entry.get()),
+    command=lambda: stop_bot(),
     relief="flat",
     activebackground="#2D2C2C"
 )
@@ -566,11 +703,11 @@ entry_bg_1 = canvas.create_image(
     image=entry_image_1
 )
 hashtags_entry = Text(
+    window,
     bd=0,
     bg="#464646",
     fg="#FFFFFF",
     highlightthickness=0,
-    cursor="",
     font=("Inter SemiBold", 14 * -1)
 )
 hashtags_entry.place(
@@ -581,6 +718,7 @@ hashtags_entry.place(
 )
 
 hashtags_entry.configure(insertbackground='white')
+hashtags_entry.bind("<KeyPress>", limit_hashtags)
 
 entry_image_2 = PhotoImage(
     file=relative_to_assets("entry_2.png"))
@@ -627,7 +765,7 @@ calltoaction_entry.place(
 )
 
 calltoaction_entry.configure(insertbackground='white')
-
+calltoaction_entry.bind("<KeyPress>", limit_hashtags)
 entry_image_4 = PhotoImage(
     file=relative_to_assets("entry_4.png"))
 entry_bg_4 = canvas.create_image(
@@ -688,7 +826,7 @@ directory_entry = Entry(
     fg="#FFFFFF",
     highlightthickness=0,
     font=("Inter SemiBold", 14 * -1),
-    disabledbackground="#464646"
+    disabledbackground="#464646",
 )
 directory_entry.place(
     x=46.0,
@@ -697,7 +835,7 @@ directory_entry.place(
     height=20.0
 )
 
-directory_entry.configure(insertbackground='white', state='disabled')
+directory_entry.configure(insertbackground='white', state='disabled', justify='right')
 
 entry_image_7 = PhotoImage(
     file=relative_to_assets("entry_7.png"))
@@ -734,7 +872,8 @@ sleep_entry = Entry(
     bg="#464646",
     fg="#FFFFFF",
     highlightthickness=0,
-    font=("Inter SemiBold", 14 * -1)
+    font=("Inter SemiBold", 14 * -1),
+    disabledbackground="#464646"
 )
 sleep_entry.place(
     x=44.0,
@@ -742,8 +881,8 @@ sleep_entry.place(
     width=53.0,
     height=24.0
 )
-
-sleep_entry.configure(insertbackground='white')
+sleep_entry.insert(0, str(60))
+sleep_entry.configure(insertbackground='white', state='disabled')
 
 canvas.create_text(
     370.0,
@@ -930,7 +1069,7 @@ ttk.Label(tab1, text="HI").grid(column=0, row=0, padx=30, pady=30)"""
 sys.stdout = StdoutRedirector(console)
 
 # Load the configuration on startup
-window.after(400, load_default_config)  # Delay call to give time for window update
+window.after(100, load_default_config)  # Delay call to give time for window update
 
 # tracks the hide password button's state
 is_password_icon_toggled = False

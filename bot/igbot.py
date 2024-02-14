@@ -5,8 +5,8 @@ import glob
 from instagrapi import Client
 from instagrapi.exceptions import LoginRequired
 from pathlib import Path
-from lib.yt_dl_app import (read_caption_mention,
-                           countdown_sleep)
+from datetime import datetime, timedelta
+
 
 # THIS IS THE BACKEND CODE THAT RUNS MAIN.PY
 # CHANGING ANYTHING IN THIS FILE COULD BREAK THE MAIN FUNCTIONS!
@@ -14,139 +14,145 @@ from lib.yt_dl_app import (read_caption_mention,
 
 class InstagramBot:
 
-    def __init__(self, delay_range: list = (5, 10)):
-        self.delay_range = delay_range
+    def __init__(self, delay_range=None):
+        if delay_range is None:
+            delay_range = [5, 10]
+        elif not (isinstance(delay_range, list) and len(delay_range) == 2
+                  and all(isinstance(n, int) for n in delay_range)):
+            raise ValueError("delay_range must be a list of two integers.")
         self.client = Client()
+        self.client.delay_range = delay_range
 
     def login_user(self, username, password, proxy=None):
-        logger = self.get_logger()
+        self.configure_client(username, password, proxy)
+        settings_path = Path("ig_settings.json")
+
+        if not self.attempt_login_with_session(settings_path):
+            self.attempt_login_with_credentials(settings_path)
+
+    def configure_client(self, username, password, proxy):
         self.client.username = username
         self.client.password = password
-        self.client.proxy = proxy
-        str_path = "ig_settings.json"
-        path = Path(str_path)
-        if self.client.proxy is None:
-            pass
-        else:
+        if proxy:
+            self.client.proxy = proxy
             self.client.set_proxy(proxy)
 
-        if self.first_login():
-            print("Logging in for the first time\n Creating session data")
-            self.client.login(username, password)
-            self.client.dump_settings(path)
-            return
-        else:
-            print("Session data found")
-            pass
-        session = self.client.load_settings(path)
-        login_via_session = False
-        login_via_pw = False
-        if session:
-            try:
-                self.client.set_settings(session)
-                self.client.login(username, password)
-
-                # check if session is valid
-                try:
-                    self.client.get_timeline_feed()
-                except LoginRequired:
-                    print("Login required")
-                    logger.info("Login required")
-
-                    old_session = self.client.get_settings()
-
-                    # use the same device uuids across logins
-                    self.client.set_settings({})
-                    self.client.set_uuids(old_session["uuids"])
-
-                    self.client.login(username, password)
-                    self.client.dump_settings(path)
-                login_via_session = True
+    def attempt_login_with_session(self, settings_path):
+        if settings_path.exists():
+            print("Session data found\nAttempting to login, please wait...")
+            session = self.client.load_settings(settings_path)
+            if self.login(session):
                 print("Logged in via session information")
-            except Exception as e:
-                print(f"An error occurred during login: {e}")
-                logger.info("Couldn't login via session information: %s" % e)
-                raise
-        if not login_via_session:
+                return True
+        else:
+            print("Logging in for the first time\nCreating session data")
+        return False
+
+    def login(self, session=None):
+        try:
+            if session:
+                self.client.set_settings(session)
+            self.client.login(self.client.username, self.client.password)
+            self.client.get_timeline_feed()  # Validates the session
+            return True
+        except (LoginRequired, Exception) as e:  # Replace Exception with specific exceptions
+            self.handle_login_exception(e, settings_path=Path("ig_settings.json"))
+            return False
+
+    def handle_login_exception(self, exception, settings_path):
+        logger = self.get_logger()
+        if isinstance(exception, LoginRequired):
+            print("Login required, attempting to relogin...")
+            logger.info("Login required, attempting to relogin...")
             try:
-                print('test')
-                logger.info("Attempting to login via username and password. username: %s" % username)
-                self.client.login(username, password)
-                self.client.dump_settings(path)
-                if self.client.get_timeline_feed():
-                    login_via_pw = True
+                old_session = self.client.get_settings()
+                # use the same device uuids across logins
+                self.client.set_settings({})
+                self.client.set_uuids(old_session["uuids"])
+                self.client.login(self.client.username, self.client.password)
+                self.client.dump_settings(settings_path)
+                logger.info("Re-login successful, settings updated")
             except Exception as e:
-                logger.info("Couldn't login user using username and password: %s" % e)
-            if not login_via_pw and not login_via_session:
-                raise Exception("Couldn't login user with either password or session")
+                # Log the exception with traceback for debugging
+                print(f"An error occurred during re-login: {e}")
+                logger.info(f"An error occurred during re-login: {e}")
+                # Reraise the exception to be handled or logged by upstream logic
+                raise
+        else:
+            print(f"An error occurred during login: {exception}")
+            logger.exception(f"Couldn't login: {exception}")
+
+    def attempt_login_with_credentials(self, settings_path):
+        if not self.login():
+            raise Exception("Couldn't login with either password or session")
+
+    def reels_to_instagram(self, reel_paths, post_data_paths, thumbnail_dir,
+                           hashtags=".", call_to_action=".", user_mention: bool = True,
+                           input_duration=60):
+        for reel_path, post_data_path in zip(reel_paths, post_data_paths):
+            print(f"Remaining files: {len(reel_paths)}")
+            caption, mention = self.read_caption_mention(post_data_path)
+            mention = f"@{mention}" if user_mention else ""
+            reel_caption = f"{caption}\n\n{call_to_action}\n\n{hashtags}\n\n{mention}"
+            print(f"Processing file: {os.path.basename(reel_path)}\nCaption: {caption}\nMention: {mention}")
+
+            try:
+                print(f"Starting upload for {os.path.basename(reel_path)}")
+                self.client.clip_upload(reel_path, reel_caption)
+                print(f"Successfully posted {os.path.basename(reel_path)} to Reels")
+                os.remove(reel_path)
+                os.remove(post_data_path)
+            except LoginRequired as e:
+                print(f"Login required exception for {os.path.basename(reel_path)}: {e}")
+                self.handle_relogin_and_upload(reel_path, reel_caption, post_data_path)
+            except Exception as e:
+                print(f"General exception for {os.path.basename(reel_path)}: {e}")
+            self.cleanup_thumbnails(thumbnail_dir)
+            sleep_duration = random.randint(60 * input_duration, 60 * (input_duration + 15))
+            future_time = datetime.now() + timedelta(seconds=sleep_duration)
+            formatted_time = future_time.strftime("%I:%M %p").lstrip("0").replace("AM", "am").replace("PM", "pm")
+            print(f"Starting the sleep timer.\n"
+                  f"I will update the time remaining every 10 minutes.\n"
+                  f"Next post will be uploaded after the sleep timer ends\n(approx:{formatted_time})\n"
+                  f"You can minimize the app and I'll continue working.\n")
+            self.countdown_sleep(sleep_duration)
+            print("Sleep timer completed. Ready to upload the next post!")
+
+    def handle_relogin_and_upload(self, reel_path, reel_caption, post_data_path):
+        self.client.relogin()
+        self.client.clip_upload(reel_path, reel_caption)
+        os.remove(reel_path)  # Consider moving these to ensure they're always executed
+        os.remove(post_data_path)
 
     @staticmethod
-    def first_login():
-        folder = os.path.dirname(os.path.abspath(__file__))
-        file = glob.glob(folder + r"\ig_settings.json")
-        print(file)
-        if file:
-            return False
+    def cleanup_thumbnails(thumbnail_dir):
+        for thumbnail_path in Path(thumbnail_dir).glob('*.jpg'):
+            os.remove(thumbnail_path)
+        print("Finished cleaning up thumbnails.")
+
+    @staticmethod
+    def countdown_sleep(duration, interval=60 * 10):
+        """
+        Sleep for a specified duration, printing the time remaining every interval seconds.
+
+        :param duration: Total sleep time in seconds.
+        :param interval: Interval in seconds at which to print the remaining time.
+        """
+        remaining = duration
+        while remaining > 0:
+            print(f"Wait time until the next post is {int(remaining // 60)} minutes...\n")
+            time.sleep(min(interval, remaining))
+            remaining -= interval
+
+    @staticmethod
+    def read_caption_mention(file_path):
+        with open(file_path, 'r', encoding='utf-8') as file:
+            line = file.readline().strip()
+        if '|' in line:
+            caption, mention = line.split('|', 1)
+            return caption.strip(), mention.strip()
         else:
-            return True
-
-    def reels_to_instagram(self, reel_path, post_data_path, thumbnail_path,
-                           hashtags=".", call_to_action=".", user_mention: bool = True):
-        data_paths = post_data_path
-        video_paths = reel_path
-        my_hashtags = hashtags
-        my_call_to_action = call_to_action
-
-        while video_paths:
-            # loop for videos in the directory
-            print(f"Remaining files: {len(video_paths)}")
-            filepath = video_paths.pop(0)
-            datapath = data_paths.pop(0)
-            caption, mention = read_caption_mention(datapath)
-            # for user_mention bool
-            if user_mention:
-                mention = f"@ {mention}"
-            else:
-                mention = ""
-            reel_caption = f"{caption}\n\n{my_call_to_action}\n\n{my_hashtags}\n\n{mention}"
-            print(f"Processing file: {filepath}, Caption: {caption}, Mention: {mention}")
-
-            filepath = Path(filepath)
-            datapath = Path(datapath)
-
-            try:
-                print(f"Starting upload for {filepath}")
-                self.client.clip_upload(filepath, reel_caption)
-                # logger.info("Posted to Reels")
-                print(f"Successfully posted {filepath} to Reels")
-                time.sleep(3)
-                os.remove(filepath)  # Delete the file after successful upload
-                os.remove(datapath)
-                # going to delete the generated thumbnail as well
-                directory = thumbnail_path
-                # Pattern to match all .jpg files
-                pattern = os.path.join(directory, '*.jpg')
-                # Find all .jpg files in the directory
-                jpg_files = glob.glob(pattern)
-                # Remove each .jpg file
-                for file_path in jpg_files:
-                    os.remove(file_path)
-                print(f"Finished cleaning up")
-            except LoginRequired as e:
-                print(f"Login required exception for {filepath}: {e}")
-                # logger.exception(f"Login required, {e}")
-                self.client.relogin()
-                self.client.clip_upload(filepath, reel_caption)
-                os.remove(filepath)  # Delete the file after successful upload
-                os.remove(datapath)
-            except Exception as e:
-                print(f"General exception for {filepath}: {e}")
-                # logger.exception(f"Error occurred: {e}")
-            finally:
-                sleep_duration = random.randint(60 * 50, 60 * 80)
-                print(f"Going to sleep now for {int(sleep_duration // 60)} minutes")
-                print("Don't disturb my slumber...")
-                countdown_sleep(sleep_duration, interval=60 * 10)
+            return "", ""
 
     @staticmethod
     def get_logger():

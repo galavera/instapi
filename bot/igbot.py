@@ -1,14 +1,17 @@
 import random
 import time
 import os
-import glob
 from instagrapi import Client
 from instagrapi.exceptions import LoginRequired
 from pathlib import Path
 from datetime import datetime, timedelta
+from threading import Event
 
 # THIS IS THE BACKEND CODE THAT RUNS MAIN.PY
 # CHANGING ANYTHING IN THIS FILE COULD BREAK THE MAIN FUNCTIONS!
+
+# stop_event as a global variable
+stop_event = Event()
 
 
 class InstagramBot:
@@ -107,14 +110,15 @@ class InstagramBot:
             except Exception as e:
                 print(f"General exception for {os.path.basename(reel_path)}: {e}")
             self.cleanup_thumbnails(thumbnail_dir)
-            sleep_duration = random.randint(60 * input_duration, 60 * (input_duration + 15))
-            future_time = datetime.now() + timedelta(seconds=sleep_duration)
-            formatted_time = future_time.strftime("%I:%M %p").lstrip("0").replace("AM", "am").replace("PM", "pm")
-            print(f"Starting the sleep timer.\n"
-                  f"Next post will be uploaded after the sleep timer ends\n(approx:{formatted_time})\n"
-                  f"You can minimize the app and I'll continue working.\n")
-            self.interruptible_sleep(sleep_duration, 30)
-            print("Sleep timer completed. Ready to upload the next post!")
+            if len(reel_paths) > 0:
+                sleep_duration = random.randint(60 * input_duration, 60 * (input_duration + 15))
+                future_time = datetime.now() + timedelta(seconds=sleep_duration)
+                formatted_time = future_time.strftime("%I:%M %p").lstrip("0").replace("AM", "am").replace("PM", "pm")
+                print(f"Starting the sleep timer.\n"
+                      f"Next post will be uploaded after the sleep timer ends\n(approx:{formatted_time})\n"
+                      f"You can minimize the app and I'll continue working.\n")
+                self.interruptible_sleep(sleep_duration, 30)
+                print("Sleep timer completed. Ready to upload the next post!")
 
     def handle_relogin_and_upload(self, reel_path, reel_caption, post_data_path):
         self.client.relogin()
@@ -130,13 +134,13 @@ class InstagramBot:
 
     @staticmethod
     def interruptible_sleep(sleep_duration, check_interval):
-        from threading import Event
-        stop_event = Event()
+        global stop_event
         stop_event.clear()
         start_time = time.time()
         while (time.time() - start_time) < sleep_duration:
             if stop_event.is_set():
                 # Stop event is set, break the sleep
+                print("Instabot has been stopped.")
                 break
             time.sleep(min(check_interval, sleep_duration - (time.time() - start_time)))
 

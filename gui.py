@@ -3,7 +3,7 @@ from bot.igbot import InstagramBot
 # Explicit imports to satisfy Flake8
 from tkinter import (Canvas, Entry, Text, Button,
                      PhotoImage, filedialog, messagebox,
-                     Menubutton, Menu, Message)
+                     Menubutton, Menu)
 # from tkinter.ttk import Notebook
 from pathlib import Path
 import json
@@ -63,8 +63,7 @@ def click_login():
         else:
             try:
                 cl.login_user(username, password, proxy)
-                window.after(0, lambda: print("Logged in successfully...\n"
-                                              "You can now start the bot."))
+                window.after(0, lambda: print("You can now start the bot."))
                 successful_login = True
             except Exception as e:
                 window.after(0, lambda e=e:
@@ -90,9 +89,9 @@ def click_start():
         starts the post scheduling feature of the bot
         :return:
         """
-        directory = window.after(0, lambda: directory_entry.get())
+        directory = directory_entry.get()
         directory = os.path.normpath(directory)
-        sleep_time = window.after(0, lambda: int(sleep_entry.get()))
+        sleep_time = int(sleep_entry.get())
         mention = False
         if not directory:
             window.after(0, lambda: messagebox.showwarning
@@ -106,8 +105,8 @@ def click_start():
                     window.after(0, lambda: messagebox.showinfo
                                  ("Error", "No mp4 or text files found in the directory.")
                                  )
-                hashtags = window.after(0, lambda: hashtags_entry.get("1.0", "end-1c"))
-                call_to_action = window.after(0, lambda: calltoaction_entry.get("1.0", "end-1c"))
+                hashtags = hashtags_entry.get("1.0", "end-1c")
+                call_to_action = calltoaction_entry.get("1.0", "end-1c")
                 window.after(0, lambda: print("Starting the bot"))
                 cl.reels_to_instagram(mp4_files, txt_files, directory,
                                       hashtags, call_to_action, mention, sleep_time)
@@ -123,8 +122,7 @@ def click_start():
 def stop_bot():
     logger.info("Stopping the bot...")
     window.after(0, lambda: print("Stopping the bot...please wait."))
-    stop_event = threading.Event()
-    stop_event.is_set()
+    cl.interruptible_sleep.stop_event.is_set()
     window.after(0, lambda: start_button.config(state='normal'))
 
 
@@ -332,6 +330,7 @@ def hide_info(event):
     global info_label
     # Destroy the label when the mouse leaves the button
     if info_label is not None:
+        # noinspection PyUnresolvedReferences
         info_label.destroy()
         info_label = None
 

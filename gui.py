@@ -218,16 +218,18 @@ def execute_config_steps():
         sleep_entry.delete(0, tk.END)
         sleep_entry.insert(0, config_data.get('sleep', ''))
         sleep_entry.configure(state='disabled')
-
-    # Execute each function sequentially
-    window.after(0, lambda: load_config_data())
-    window.after(0, lambda: update_username_entry())
-    window.after(0, lambda: update_password_entry())
-    window.after(0, lambda: update_directory_entry())
-    window.after(0, lambda: update_hashtags_entry())
-    window.after(0, lambda: update_calltoaction_entry())
-    window.after(0, lambda: update_proxy_entry())
-    window.after(0, lambda: update_sleep_entry())
+    if os.path.exists('autosave.json'):
+        # Execute each function sequentially
+        window.after(0, lambda: load_config_data())
+        window.after(0, lambda: update_username_entry())
+        window.after(0, lambda: update_password_entry())
+        window.after(0, lambda: update_directory_entry())
+        window.after(0, lambda: update_hashtags_entry())
+        window.after(0, lambda: update_calltoaction_entry())
+        window.after(0, lambda: update_proxy_entry())
+        window.after(0, lambda: update_sleep_entry())
+    else:
+        pass
 
 
 def load_config():

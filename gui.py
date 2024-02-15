@@ -628,8 +628,6 @@ sleep_plus_button.place(
     height=30.0
 )
 
-button_image_9 = PhotoImage(
-    file=relative_to_assets("cog.png"))
 settings_button = Menubutton(
     # image=button_image_9,
     text="CONFIGURATION",

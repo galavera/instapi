@@ -40,7 +40,13 @@ class StdoutRedirector(object):
 
 
 def relative_to_assets(path: str) -> Path:
-    return ASSETS_PATH / Path(path)
+    if getattr(sys, 'frozen', False):
+        # If the application is frozen, use the _MEIPASS directory
+        base_path = Path(sys._MEIPASS)
+    else:
+        # If the application is not frozen, use the directory that contains the script
+        base_path = Path(__file__).resolve().parent
+    return base_path / "build" / "assets" / path
 
 
 def click_login():
@@ -334,15 +340,19 @@ def hide_info(event):
 
 
 def on_close():
-    save_default_config()
-    window.destroy()
+    save_label = tk.Label(window, text="Saving current layout...", font=("Inter SemiBold", 10),
+                          bg="grey", fg="white", relief="solid",
+                          borderwidth=1, padx=5, pady=5, justify="left")
+    save_label.place(relx=0.5, rely=0.5, anchor="center")
+    window.after(1300, lambda: save_label.destroy())
+    window.after(1400, lambda: save_default_config())
+    window.after(1500, lambda: window.destroy())
 
 
 window = tk.Tk()
 window.withdraw()
-window.title("instabot")
-# window.overrideredirect(True)
-# window.iconphoto(False, PhotoImage(file=relative_to_assets("instapi_2.png")))
+window.title("instapi")
+window.iconphoto(False, PhotoImage(file=relative_to_assets("instapi_2.png")))
 
 """tabConbtrol = ttk.Notebook(window)
 tab1 = ttk.Frame(tabConbtrol)"""
@@ -632,11 +642,12 @@ sleep_plus_button.place(
 
 settings_button = Menubutton(
     # image=button_image_9,
-    text="CONFIGURATION",
+    text="SETTINGS",
     font=("Inter Bold", 14 * -1),
     fg="grey",
     borderwidth=0,
-    highlightthickness=0,
+    highlightthickness=1,
+    highlightcolor="#464646",
     relief="flat",
     activebackground="#2D2C2C",
     disabledforeground="#464646",
@@ -645,14 +656,16 @@ settings_button = Menubutton(
 settings_button.place(
     x=570.0,
     y=14.0,
-    width=120.0,
-    height=18.0
+    width=100.0,
+    height=22.0
 )
 dropdown_menu = Menu(settings_button, tearoff=False, bg="#2D2C2C", fg="grey", activeforeground="white",
                      font=("Inter SemiBold", 12 * -1), activebackground="#2D2C2C")
 settings_button.config(menu=dropdown_menu, background="#2D2C2C", activebackground="#2D2C2C")
 dropdown_menu.add_command(label="Save config", command=save_config)
 dropdown_menu.add_command(label="Load config", command=load_config)
+dropdown_menu.add_command(label="About")
+dropdown_menu.add_command(label="Help")
 
 button_image_10 = PhotoImage(
     file=relative_to_assets("button_10.png"))

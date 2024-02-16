@@ -18,6 +18,7 @@ instagram. It also uses the `tkinter` library for the GUI.
 You can start the gui by running the `instapi.py` file. You can also run the `instapi.exe` file located in the EXE folder if you are on Windows x64 (I tested it on Win11, not sure if it will work on Win10).
 
 * You MUST add unique captions for each video, to do this create a .txt file with the same name as the video file. The text file should contain the caption for the video in one continous line (NO LINE BREAKS, try disabling wordwrap if you are not sure). The text file should also be in the same directory as the video file. See the "reels_example" folder for an example on how to set up your files.
+* NOTE: This is going to delete the files in the folder as it uploads. So if you want to save the videos for something else make a copy elsewhere.
 
 ## Roadmap
 * Add support for posting images.

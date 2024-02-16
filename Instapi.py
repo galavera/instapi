@@ -61,8 +61,8 @@ def click_login():
         proxy = proxy_entry.get()
         if not username or not password:
             window.after(0, lambda:
-                         messagebox.showwarning
-                         ("Login Failed", "Username or password cannot be empty.")
+            messagebox.showwarning
+            ("Login Failed", "Username or password cannot be empty.")
                          )
             successful_login = False
         else:
@@ -72,8 +72,8 @@ def click_login():
                 successful_login = True
             except Exception as e:
                 window.after(0, lambda e=e:
-                             messagebox.showerror
-                             ("Login Failed", f"An error occurred during login: {e}")
+                messagebox.showerror
+                ("Login Failed", f"An error occurred during login: {e}")
                              )
                 successful_login = False
             window.after(0, lambda: successful_login)
@@ -99,7 +99,7 @@ def click_start():
         mention = False
         if not directory:
             window.after(0, lambda: messagebox.showwarning
-                         ("Error", "Directory cannot be empty.")
+            ("Error", "Directory cannot be empty.")
                          )
             return
         elif directory:
@@ -107,7 +107,7 @@ def click_start():
                 mp4_files, txt_files = setup_folders(directory)
                 if not mp4_files or not txt_files:
                     window.after(0, lambda: messagebox.showinfo
-                                 ("Error", "No mp4 or text files found in the directory.")
+                    ("Error", "No mp4 or text files found in the directory.")
                                  )
                 hashtags = hashtags_entry.get("1.0", "end-1c")
                 call_to_action = calltoaction_entry.get("1.0", "end-1c")
@@ -224,6 +224,7 @@ def execute_config_steps():
         sleep_entry.delete(0, tk.END)
         sleep_entry.insert(0, config_data.get('sleep', ''))
         sleep_entry.configure(state='disabled')
+
     if os.path.exists('autosave.json'):
         # Execute each function sequentially
         window.after(0, lambda: load_config_data())
@@ -313,7 +314,7 @@ def limit_hashtags(event):
     # Check hashtags and if the last character is space to allow for deletion of tags
     if len(hashtags + hashtags2) >= 29 and event.char == '#':
         window.after(0, lambda: messagebox.showinfo
-                     ("Instagram", "You have reached the maximum number of hashtags.\n"
+        ("Instagram", "You have reached the maximum number of hashtags.\n"
                       "Instagram only allows 30 hashtags.")
                      )
         return 'break'  # Prevent insertion of more hashtags
@@ -472,8 +473,8 @@ info_button_3.bind("<Enter>", partial(show_info, text="proxy:\n"
                                                       "Enter your proxy if you have one.\n\n"
                                                       "sleep:\n"
                                                       "Enter the time in minutes to wait\n"
-                                                      "between each post\n\n."
-                                                      "NOTE: your sleep time will be increased\n"
+                                                      "between each post.\n\n"
+                                                      "**NOTE** your sleep time will be increased\n"
                                                       "randomly each post by 1 to 15 minutes\n"
                                                       "as a precaution to avoid bot detection.", x=300, y=454))
 info_button_3.bind("<Leave>", hide_info)
@@ -664,8 +665,29 @@ dropdown_menu = Menu(settings_button, tearoff=False, bg="#2D2C2C", fg="grey", ac
 settings_button.config(menu=dropdown_menu, background="#2D2C2C", activebackground="#2D2C2C")
 dropdown_menu.add_command(label="Save config", command=save_config)
 dropdown_menu.add_command(label="Load config", command=load_config)
-dropdown_menu.add_command(label="About")
-dropdown_menu.add_command(label="Help")
+
+
+def about_label():
+    window.after(0, lambda: messagebox.showinfo("About",
+                                                "Instapi is a simple, lightweight and easy to use\n"
+                                                "Instagram bot that allows you to automate\n"
+                                                "your account.\n\n"
+                                                "It is designed to help you save time and\n"
+                                                "effort by automating the process of posting\n"
+                                                "reels to Instagram.\n\n"
+                                                "https://github.com/galavera/instapi\n"
+                                                "mikegalavera@gmail.com"))
+
+
+def help_label():
+    window.after(0, lambda: messagebox.showinfo("Help",
+                                                "For help and support, please go to my github repo\n"
+                                                "https://github.com/galavera/instapi\nor check out the discord.\n"
+                                                "https://discord.gg/E95G4FDw3a"))
+
+
+dropdown_menu.add_command(label="About", command=about_label)
+dropdown_menu.add_command(label="Help", command=help_label)
 
 button_image_10 = PhotoImage(
     file=relative_to_assets("button_10.png"))

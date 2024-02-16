@@ -18,7 +18,7 @@ class InstagramBot:
 
     def __init__(self, delay_range=None):
         if delay_range is None:
-            delay_range = [5, 10]
+            delay_range = [2, 15]
         elif not (isinstance(delay_range, list) and len(delay_range) == 2
                   and all(isinstance(n, int) for n in delay_range)):
             raise ValueError("delay_range must be a list of two integers.")
@@ -96,10 +96,9 @@ class InstagramBot:
         for reel_path, post_data_path in zip(reel_paths, post_data_paths):
             if not stop_event.is_set():
                 print(f"Remaining files: {len(reel_paths)}")
-                caption, mention = self.read_caption_mention(post_data_path)
-                mention = f"@{mention}" if user_mention else ""
-                reel_caption = f"{caption}\n\n{call_to_action}\n\n{hashtags}\n\n{mention}"
-                print(f"Processing file: {os.path.basename(reel_path)}\nCaption: {caption}\nMention: {mention}")
+                caption = self.read_caption_mention(post_data_path)
+                reel_caption = f"{caption}\n\n{call_to_action}\n\n{hashtags}"
+                print(f"Processing file: {os.path.basename(reel_path)}\nCaption: {caption}")
                 try:
                     print(f"Starting upload for {os.path.basename(reel_path)}")
                     self.client.clip_upload(reel_path, reel_caption)
@@ -172,11 +171,8 @@ class InstagramBot:
     def read_caption_mention(file_path):
         with open(file_path, 'r', encoding='utf-8') as file:
             line = file.readline().strip()
-        if '|' in line:
-            caption, mention = line.split('|', 1)
-            return caption.strip(), mention.strip()
-        else:
-            return "", ""
+            caption = line.strip()
+            return caption
 
     @staticmethod
     def get_logger():

@@ -1,8 +1,7 @@
 # Instapi
 
-A simple GUI for automating instagram post.
-![instapi_window](https://github.com/galavera/instapi/assets/155681070/6dfeb96d-28a3-473b-a3d3-4eb4c33f7fb0)
-
+A simple GUI for automating instagram posts.  
+<img src="https://github.com/galavera/instapi/assets/155681070/6dfeb96d-28a3-473b-a3d3-4eb4c33f7fb0" width="300">
 ## Description
 
 This is a simple GUI for automating instagram posts. It uses the `instagrapi` library to post videos to 
